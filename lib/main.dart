@@ -1,115 +1,172 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(ChangeNotifierProvider(
+    create: (_) => BreadCrumbProvider(),
+    child: MaterialApp(
+      title: 'Flutter providr practice',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      debugShowCheckedModeBanner: false,
+      home: const HomePage(),
+      routes: {
+        '/new': (context) => const NewBreadCrumbWidget(),
+      },
+    ),
+  ));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class BreadCrumb {
+  bool isActive;
+  final String name;
+  final String uuid;
+  BreadCrumb({required this.isActive, required this.name})
+      : uuid = const Uuid().v4();
 
-  // This widget is the root of your application.
+  @override
+  bool operator ==(covariant BreadCrumb other) => uuid == other.uuid;
+
+  @override
+  int get hashCode => uuid.hashCode;
+  String get title => name + (isActive ? ' >' : '');
+  void activate() {
+    isActive = true;
+  }
+}
+
+class BreadCrumbProvider extends ChangeNotifier {
+  //_items list that can be change
+  final List<BreadCrumb> _items = [];
+  //we use outside of provider item list which is unmodifiable so outside of code it wont be modify
+  UnmodifiableListView<BreadCrumb> get items => UnmodifiableListView(_items);
+
+  void add(BreadCrumb breadCrumb) {
+    print("Inside provider add");
+    for (final item in _items) {
+      //activate the previous items in list
+      item.activate();
+    }
+    //add new breadCrumb in _items list
+    _items.add(breadCrumb);
+    //notify others about change
+    notifyListeners();
+  }
+
+  void reset() {
+    print("Inside provider reset");
+
+    _items.clear();
+    notifyListeners();
+  }
+}
+
+class BreadCrumbsWidget extends StatelessWidget {
+  final UnmodifiableListView<BreadCrumb> breadCrumbs;
+  const BreadCrumbsWidget({Key? key, required this.breadCrumbs})
+      : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+    return Wrap(
+        children: breadCrumbs.map((breadCrumb) {
+      return Text(breadCrumb.title,
+          style: TextStyle(
+              color: breadCrumb.isActive ? Colors.lightGreen : Colors.black));
+    }).toList());
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('HomePage')),
+      body: Center(
+        child: Column(
+          children: [
+            //Consumer consume [BreadCrumbProvider] and rebuild the widget [BreadCrumbWidget]
+            Consumer<BreadCrumbProvider>(builder: (context, value, child) {
+              print("consumer recive data");
+              return BreadCrumbsWidget(breadCrumbs: value.items);
+            }),
+            TextButton(
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/new');
+                  print("navigator");
+                },
+                child: const Text(
+                  "add new bead crumb",
+                  style: TextStyle(fontSize: 20),
+                )),
+            TextButton(
+                onPressed: () {
+                  print("call reset");
+                  //read a context to access provider and provide functionality to its decendants
+                  context.read<BreadCrumbProvider>().reset();
+                },
+                child: const Text("reset", style: TextStyle(fontSize: 20))),
+          ],
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class NewBreadCrumbWidget extends StatefulWidget {
+  const NewBreadCrumbWidget({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<NewBreadCrumbWidget> createState() => _NewBreadCrumbWidgetState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _NewBreadCrumbWidgetState extends State<NewBreadCrumbWidget> {
+  late final TextEditingController _controller;
+  @override
+  void initState() {
+    _controller = TextEditingController();
+    super.initState();
+  }
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void dispose() {
+    _controller.dispose;
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text("Add a new breadcrumb"),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
+      body: Column(
+        children: [
+          TextField(
+            controller: _controller,
+            decoration:
+                const InputDecoration(hintText: "Enter a new Bread Crumb here"),
+          ),
+          TextButton(
+              onPressed: () {
+                print("add new breadcrumb");
+                final text = _controller.text;
+                //create a bread crumb
+                final breadCrumb = BreadCrumb(isActive: false, name: text);
+
+                //add a breadCrumb in list
+                context.read<BreadCrumbProvider>().add(breadCrumb);
+
+                //navigate to previous screen
+                Navigator.pop(context);
+              },
+              child: const Text("Add")),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
